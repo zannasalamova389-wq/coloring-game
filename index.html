@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Раскрась картинку</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    padding: 15px;
+    font-family: Arial, sans-serif;
+    background: #f0f0f0;
+    text-align: center;
+    min-height: 100vh;
+  }
+  h1 { color: #333; font-size: 22px; margin: 5px 0 15px; }
+
+  /* Меню выбора картинки */
+  .menu {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    max-width: 700px;
+    margin: 0 auto 15px;
+  }
+  .menu.hidden { display: none; }
+  .menu-item {
+    background: #fff;
+    border-radius: 10px;
+    padding: 8px;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: 0.2s;
+    width: 100px;
+  }
+  .menu-item:hover { transform: scale(1.05); border-color: #4a90d9; }
+  .menu-item img { width: 100%; height: 80px; object-fit: contain; display: block; }
+  .menu-item span { font-size: 12px; font-weight: bold; color: #555; display: block; margin-top: 4px; }
+
+  /* Игровой экран */
+  .game { display: none; }
+  .game.active { display: block; }
+
+  .canvas-wrapper {
+    display: inline-block;
+    background: #fff;
+    border: 2px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  canvas {
+    display: block;
+    cursor: crosshair;
+    background: #fff;
+    touch-action: none;
+  }
+
+  /* Палитра */
+  .palette {
+    margin: 15px auto 10px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    max-width: 600px;
+  }
+  .color {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 3px solid #ccc;
+    cursor: pointer;
+    transition: 0.1s;
+  }
+  .color:hover { transform: scale(1.1); }
+  .color.active { border-color: #333; transform: scale(1.15); }
+
+  /* Кнопки */
+  .buttons {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: white;
+  }
+  #backBtn  { background: #4a90d9; }
+  #clearBtn { background: #e74c3c; }
+  #saveBtn  { background: #27ae60; }
+</style>
+</head>
+<body>
+
+  <!-- ЭКРАН ВЫБОРА -->
+  <div id="menuScreen">
+    <h1>🎨 Выбери картинку</h1>
+    <div class="menu" id="menu"></div>
+  </div>
+
+  <!-- ИГРОВОЙ ЭКРАН -->
+  <div class="game" id="game">
+    <h1 id="gameTitle">Раскрась картинку</h1>
+    <div class="canvas-wrapper">
+      <canvas id="canvas" width="600" height="450"></canvas>
+    </div>
+
+    <div class="palette" id="palette"></div>
+
+    <div class="buttons">
+      <button id="backBtn">← Назад</button>
+      <button id="clearBtn">Очистить</button>
+      <button id="saveBtn">💾 Сохранить</button>
+    </div>
+  </div>
+
+<script>
+// ============================================================
+// СПИСОК ПЕРСОНАЖЕЙ
+// ============================================================
+const CHARACTERS = [
+  { name: 'Ящерка',    file: 'lizard.png' },
+  { name: 'Поросёнок', file: 'pigle.png' },
+  { name: 'Барт',      file: 'bart.png' },
+  { name: 'Черепашка', file: 'turtle.png' },
+  { name: 'Призрак',   file: 'ghost.png' }
+];
+
+const COLORS = [
+  '#FF0000','#FF6B00','#FFD700','#00C853','#00B0FF',
+  '#2962FF','#8E24AA','#FF4081','#795548','#000000',
+  '#FFFFFF','#9E9E9E'
+];
+
+// ============================================================
+// ПЕРЕМЕННЫЕ
+// ============================================================
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let currentColor = '#FF0000';
+let currentImageSrc = '';
+let isDrawing = false;
+let lastX = 0, lastY = 0;
+const BRUSH_SIZE = 25;
+
+// Загруженный контур (для повторного использования)
+let outlineImg = new Image();
+
+// ============================================================
+// МЕНЮ
+// ============================================================
+function buildMenu() {
+  const menu = document.getElementById('menu');
+  menu.innerHTML = '';
+
+  CHARACTERS.forEach(char => {
+    const item = document.createElement('div');
+    item.className = 'menu-item';
+
+    const img = document.createElement('img');
+    img.src = char.file;
+    img.alt = char.name;
+    img.onerror = () => {
+      img.style.background = '#eee';
+      img.alt = 'Нет';
+    };
+
+    const span = document.createElement('span');
+    span.textContent = char.name;
+
+    item.appendChild(img);
+    item.appendChild(span);
+    item.addEventListener('click', () => startGame(char.file, char.name));
+
+    menu.appendChild(item);
+  });
+}
+
+function startGame(file, name) {
+  console.log('Старт:', file);
+  currentImageSrc = file;
+  document.getElementById('menuScreen').style.display = 'none';
+  document.getElementById('game').classList.add('active');
+  document.getElementById('gameTitle').textContent = 'Раскрась: ' + name;
+
+  // Загружаем картинку и рисуем как фон
+  outlineImg = new Image();
+  outlineImg.onload = () => {
+    redraw();
+    console.log('Картинка загружена:', file);
+  };
+  outlineImg.onerror = () => {
+    console.error('Не найдена картинка:', file);
+    alert('Картинка не найдена: ' + file);
+  };
+  outlineImg.src = file;
+
+  // Очищаем историю и сбрасываем цвет
+  currentColor = '#FF0000';
+  updatePaletteActive();
+}
+
+function showMenu() {
+  document.getElementById('game').classList.remove('active');
+  document.getElementById('menuScreen').style.display = 'block';
+}
+
+// ============================================================
+// ПАЛИТРА
+// ============================================================
+function buildPalette() {
+  const palette = document.getElementById('palette');
+  palette.innerHTML = '';
+
+  COLORS.forEach((color, index) => {
+    const btn = document.createElement('div');
+    btn.className = 'color';
+    btn.style.background = color;
+    btn.dataset.color = color;
+
+    if (color === '#FFFFFF') {
+      btn.style.border = '3px dashed #999';
+      btn.title = 'Ластик';
+    }
+    if (index === 0) btn.classList.add('active');
+
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.color').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentColor = color;
+      console.log('Цвет:', color);
+    });
+
+    palette.appendChild(btn);
+  });
+}
+
+function updatePaletteActive() {
+  document.querySelectorAll('.color').forEach(b => {
+    b.classList.toggle('active', b.dataset.color === currentColor);
+  });
+}
+
+// ============================================================
+// РИСОВАНИЕ
+// ============================================================
+function redraw() {
+  // 1. Белый фон
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Картинка-контур
+  if (outlineImg.complete && outlineImg.naturalWidth > 0) {
+    // Сохраняем пропорции: вписываем в canvas
+    const imgRatio = outlineImg.naturalWidth / outlineImg.naturalHeight;
+    const canvasRatio = canvas.width / canvas.height;
+
+    let w, h, x, y;
+    if (imgRatio > canvasRatio) {
+      w = canvas.width;
+      h = canvas.width / imgRatio;
+      x = 0;
+      y = (canvas.height - h) / 2;
+    } else {
+      h = canvas.height;
+      w = canvas.height * imgRatio;
+      x = (canvas.width - w) / 2;
+      y = 0;
+    }
+
+    ctx.drawImage(outlineImg, x, y, w, h);
+  }
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  // Учитываем масштабирование canvas через CSS
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  };
+}
+
+// ============================================================
+// СОБЫТИЯ МЫШИ
+// ============================================================
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return; // только левая кнопка
+  e.preventDefault();
+  isDrawing = true;
+
+  const pos = getPos(e);
+  lastX = pos.x;
+  lastY = pos.y;
+
+  // Рисуем точку сразу
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, BRUSH_SIZE / 2, 0, Math.PI * 2);
+  ctx.fillStyle = currentColor;
+  ctx.fill();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!isDrawing) return;
+  e.preventDefault();
+
+  const pos = getPos(e);
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(pos.x, pos.y);
+  ctx.strokeStyle = currentColor;
+  ctx.lineWidth = BRUSH_SIZE;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  lastX = pos.x;
+  lastY = pos.y;
+});
+
+canvas.addEventListener('mouseup', () => { isDrawing = false; });
+canvas.addEventListener('mouseleave', () => { isDrawing = false; });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ============================================================
+// ТАЧ-СОБЫТИЯ (для телефона)
+// ============================================================
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  isDrawing = true;
+  const touch = e.touches[0];
+  const pos = getPos(touch);
+  lastX = pos.x;
+  lastY = pos.y;
+
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, BRUSH_SIZE / 2, 0, Math.PI * 2);
+  ctx.fillStyle = currentColor;
+  ctx.fill();
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (!isDrawing) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const pos = getPos(touch);
+
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(pos.x, pos.y);
+  ctx.strokeStyle = currentColor;
+  ctx.lineWidth = BRUSH_SIZE;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  lastX = pos.x;
+  lastY = pos.y;
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => { isDrawing = false; });
+
+// ============================================================
+// КНОПКИ
+// ============================================================
+document.getElementById('backBtn').addEventListener('click', showMenu);
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  redraw();
+  console.log('Очищено');
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'my-coloring.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+// ============================================================
+// ЗАПУСК
+// ============================================================
+buildMenu();
+buildPalette();
+console.log('Игра-раскраска запущена');
+</script>
+</body>
+</html>
