@@ -18,7 +18,6 @@
   body { padding: 10px; }
   h1 { color: #333; font-size: 20px; margin: 5px 0 12px; }
 
-  /* ===== Меню ===== */
   .menu {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
@@ -42,7 +41,6 @@
   .menu-item img { width: 100%; height: 70px; object-fit: contain; display: block; pointer-events: none; }
   .menu-item span { font-size: 12px; font-weight: bold; color: #555; margin-top: 3px; }
 
-  /* ===== Игра ===== */
   .game { display: none; }
   .game.active { display: block; }
 
@@ -65,7 +63,6 @@
     cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><path d='M4 28 L4 24 L20 8 L24 12 L8 28 Z' fill='%23d2691e' stroke='%23222' stroke-width='1.5'/><path d='M20 8 L24 12 L26 10 C27 9 27 7 26 6 L24 4 C23 3 21 3 20 4 L18 6 Z' fill='%23ffd700' stroke='%23222' stroke-width='1.5'/></svg>") 4 28, crosshair;
   }
 
-  /* Анимация «подпрыгивание» после раскраски */
   @keyframes bounce {
     0%   { transform: scale(1) rotate(0deg); }
     25%  { transform: scale(1.05) rotate(-2deg); }
@@ -78,7 +75,6 @@
     box-shadow: 0 0 30px 5px rgba(255, 215, 0, 0.8);
   }
 
-  /* ===== Панель инструментов ===== */
   .toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -118,7 +114,6 @@
   .brush-btn[data-size="25"] .dot { width: 14px; height: 14px; }
   .brush-btn[data-size="45"] .dot { width: 22px; height: 22px; }
 
-  /* Кнопка «Заливка» */
   .tool-btn {
     width: 38px; height: 38px;
     border-radius: 50%;
@@ -135,7 +130,6 @@
   .tool-btn:hover { transform: scale(1.1); }
   .tool-btn.active { border-color: #333; background: #ffe8b3; }
 
-  /* ===== Палитра ===== */
   .palette {
     margin: 8px auto;
     display: flex;
@@ -163,7 +157,6 @@
     background: #fff !important;
   }
 
-  /* ===== Кнопки ===== */
   .buttons {
     margin-top: 12px;
     display: flex;
@@ -190,7 +183,6 @@
   #clearBtn { background: #e74c3c; }
   #saveBtn  { background: #27ae60; }
 
-  /* ===== МОБИЛЬНАЯ ОПТИМИЗАЦИЯ ===== */
   @media (max-width: 600px) {
     body { padding: 6px; }
     h1 { font-size: 17px; margin: 4px 0 8px; }
@@ -208,13 +200,11 @@
 </head>
 <body>
 
-  <!-- ЭКРАН ВЫБОРА -->
   <div id="menuScreen">
     <h1>🎨 Выбери картинку</h1>
     <div class="menu" id="menu"></div>
   </div>
 
-  <!-- ИГРОВОЙ ЭКРАН -->
   <div class="game" id="game">
     <h1 id="gameTitle">Раскрась картинку</h1>
 
@@ -222,7 +212,6 @@
       <canvas id="canvas" width="600" height="450"></canvas>
     </div>
 
-    <!-- Панель инструментов -->
     <div class="toolbar">
       <span class="toolbar-label">Кисть:</span>
       <div class="brush-sizes" id="brushSizes">
@@ -249,7 +238,7 @@
 
 <script>
 // ============================================================
-// СПИСОК ПЕРСОНАЖЕЙ
+// СПИСОК ПЕРСОНАЖЕЙ — РАСШИРЕНИЯ .PNG
 // ============================================================
 const CHARACTERS = [
   { name: 'Ящерка',    file: 'lizard.png' },
@@ -280,14 +269,12 @@ let currentColor = '#FF0000';
 let isDrawing = false;
 let lastX = 0, lastY = 0;
 let brushSize = 25;
-let currentTool = 'brush'; // 'brush' или 'fill'
+let currentTool = 'brush';
 
 let history = [];
 const MAX_HISTORY = 30;
 
 let outlineImg = new Image();
-
-// Флаг: был ли уже праздник (чтобы не повторять анимацию)
 let hasCelebrated = false;
 
 // ============================================================
@@ -324,6 +311,7 @@ function startGame(file, name) {
   canvasWrapper.classList.remove('celebrate');
 
   outlineImg = new Image();
+  outlineImg.crossOrigin = 'anonymous';
   outlineImg.onload = () => {
     redraw();
     updateUndoButton();
@@ -397,7 +385,7 @@ function updateBrushActive() {
 }
 
 // ============================================================
-// ИНСТРУМЕНТЫ (КИСТЬ / ЗАЛИВКА)
+// ИНСТРУМЕНТЫ
 // ============================================================
 function initTools() {
   document.getElementById('brushTool').addEventListener('click', () => {
@@ -461,7 +449,7 @@ function redraw() {
 }
 
 // ============================================================
-// ЗАЛИВКА (Flood Fill)
+// ЗАЛИВКА
 // ============================================================
 function hexToRgb(hex) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -482,15 +470,14 @@ function colorsMatch(a, b, tolerance = 32) {
 function floodFill(startX, startY, fillColorHex) {
   const w = canvas.width;
   const h = canvas.height;
-
   if (startX < 0 || startY < 0 || startX >= w || startY >= h) return;
 
   let imageData;
   try {
     imageData = ctx.getImageData(0, 0, w, h);
   } catch (e) {
-    console.error('Не удалось прочитать пиксели:', e);
-    alert('Заливка не работает. Откройте игру через GitHub Pages (https://...), а не локально.');
+    console.error('Ошибка getImageData:', e);
+    alert('Заливка не работает. Откройте игру через GitHub Pages.');
     return;
   }
 
@@ -500,13 +487,9 @@ function floodFill(startX, startY, fillColorHex) {
 
   const startIdx = (startY * w + startX) * 4;
   const targetColor = [
-    data[startIdx],
-    data[startIdx + 1],
-    data[startIdx + 2],
-    data[startIdx + 3]
+    data[startIdx], data[startIdx + 1], data[startIdx + 2], data[startIdx + 3]
   ];
 
-  // Если уже этот цвет — ничего не делаем
   if (colorsMatch(targetColor, [fillColor.r, fillColor.g, fillColor.b, 255], 10)) return;
 
   const stack = [[startX, startY]];
@@ -535,16 +518,13 @@ function floodFill(startX, startY, fillColorHex) {
 }
 
 // ============================================================
-// АНИМАЦИЯ ПОСЛЕ РАСКРАСКИ
+// АНИМАЦИЯ
 // ============================================================
 function celebrate() {
   if (hasCelebrated) return;
   hasCelebrated = true;
   canvasWrapper.classList.add('celebrate');
-  console.log('🎉 Праздник!');
-  setTimeout(() => {
-    canvasWrapper.classList.remove('celebrate');
-  }, 1300);
+  setTimeout(() => canvasWrapper.classList.remove('celebrate'), 1300);
 }
 
 // ============================================================
@@ -587,7 +567,6 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
   e.preventDefault();
   saveHistory();
-
   const pos = getPos(e);
 
   if (currentTool === 'fill') {
